@@ -25,6 +25,7 @@ select
 	case when t2.单价 is null then 0 else t2.单价 end as 上一次单价,
 	case when t3.单价 is null then 0 else t3.单价 end as 上上次
 from
-(select 物品, 单价 最新单价 from t_over where sort_num=1) as t1
+t_over as t1
 left join t_over as t2 on t2.物品 = t1.物品 and t2.sort_num=2
 left join t_over as t3 on t3.物品 = t1.物品 and t3.sort_num=3
+where t1.sort_num=1 and t2.sort_num=2 and t3.sort_num=3
