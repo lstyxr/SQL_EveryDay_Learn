@@ -67,23 +67,17 @@ values
 ('07','03',98)
 
 --1、查询“01”课程比“02”课程成绩高的学生信息及课程分数
-select Stu.s_name,Cou.c_name,t2.score_01 from
-	(select s_id from
-		(select s1.s_id,s1.c_id,s1.s_score as score_01,s2.s_score as score_02 from Score s1, Score s2
-		where s2.c_id = '02'
-		and s2.s_id = s1.s_id
-		and s1.c_id in('01','02')) t1
-	where score_01>score_02) t2
-join Student Stu
-on Stu.s_id=t2.s_id
-join Course Cou
-on Cou.c_id=t2.c_id
+-- score,student
 
-select * from Score
-where s_id in(
-select s_id from
-		(select s1.s_id,s1.c_id,s1.s_score as score_01,s2.s_score as score_02 from Score s1, Score s2
-		where s2.c_id = '02'
-		and s2.s_id = s1.s_id
-		and s1.c_id in('01','02')) t1
-	where score_01>score_02)
+select
+	c.*,
+	a.s_score s01,
+	b.s_score s02
+from
+	Score a, Score b, Student c
+where
+	a.c_id='01'
+and b.c_id='02'
+and a.s_id=b.s_id
+and a.s_score>b.s_score
+and a.s_id=c.s_id
