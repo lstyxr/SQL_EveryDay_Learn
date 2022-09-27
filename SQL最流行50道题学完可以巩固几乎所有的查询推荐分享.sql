@@ -138,7 +138,8 @@ group by
 having
 	AVG(a.s_score)>=60
 
---3、查询平均成绩小于60分的同学的学生编号、学生姓名和平均成绩
+--4、查询平均成绩小于60分的同学的学生编号、学生姓名和平均成绩，注意要包含没有成绩的学生
+--不包含没有成绩的学生
 select
 	a.s_id,s.s_name,
 	AVG(a.s_score) avg_s
@@ -151,8 +152,26 @@ group by
 having
 	AVG(a.s_score)<60
 
+--包含没有成绩的学生
+select
+	s.s_id,
+	s.s_name,
+	isnull(AVG(a.s_score),0) avg_s
+from
+	Score a
+right join
+	Student s
+on
+	s.s_id=a.s_id
+group by
+	s.s_id,
+	s.s_name
+having
+	isnull(AVG(a.s_score),0)<60
+order by
+	s.s_id
 
---4、查询所有同学的学生编号、学生姓名、选课总数、所有课程的总成绩
+--5、查询所有同学的学生编号、学生姓名、选课总数、所有课程的总成绩，注意要包含没有成绩的学生
 select
 	a.s_id,
 	s.s_name,
@@ -167,10 +186,10 @@ group by
 
 
 select
-	a.s_id,
+	s.s_id,
 	s.s_name,
 	COUNT(a.c_id) cnt_c,
-	SUM(a.s_score) sum_s
+	isnull(SUM(a.s_score),0) sum_s
 from
 	Score a
 right join
@@ -178,4 +197,136 @@ right join
 on
 	a.s_id=s.s_id
 group by
-	a.s_id,s.s_name
+	s.s_id,
+	s.s_name
+order by
+	s.s_id
+
+--6、查询 ‘李’姓老师的数量
+select
+	count(*) cnt_t
+from
+	Teacher
+where
+	t_name like '李%'
+
+--7、查询学过‘张三’老师授课的学生信息
+select * from Score
+select * from Student
+select * from Teacher
+select * from Course
+
+--自创
+select
+	*
+from
+	Student
+where
+	s_id
+in
+	(select
+		a.s_id
+	from
+		Score a
+	where
+		a.c_id
+in
+	(select
+		c.c_id
+	from
+		Course c
+	where
+		c.t_id
+in
+	(select
+		t.t_id
+	from
+		Teacher t
+	where
+		t.t_name='张三')))
+
+--简化
+select
+	d.*
+from
+	Score a, Course b, Teacher c, Student d
+where
+	a.c_id=b.c_id
+and b.t_id=c.t_id
+and	d.s_id=a.s_id
+and	c.t_name='张三'
+
+--8、查询没学过‘张三’老师授课的学生信息
+--not in方法
+select * from Student where s_id not in(
+select
+	a.s_id
+from
+	Score a, Course b, Teacher c
+where
+	a.c_id=b.c_id
+and b.t_id=c.t_id
+and	c.t_name='张三')
+
+--not exists方法
+select * from Student where not exists(
+	select 1 from
+		(select
+			a.s_id
+		from
+			Score a, Course b, Teacher c
+		where
+			a.c_id=b.c_id
+		and b.t_id=c.t_id
+		and c.t_name='张三') t
+	where t.s_id=Student.s_id)
+
+--9、查询学过编号‘01’并且也学过编号‘02’课程的同学信息
+--自创
+select * from Student where s_id in(
+select
+	t2.s_id
+from
+	(select
+		t.s_id,
+		COUNT(t.c_id) cnt_c
+	from
+		(select
+			*
+		from
+			Score a
+		where
+			a.c_id in ('01','02')) t
+	group by
+		t.s_id
+	having
+		COUNT(t.c_id)>1) t2)
+
+--自连接
+select
+	c.*
+from
+	Score a,Score b,Student c
+where
+	a.c_id='01'
+and b.c_id='02'
+and a.s_id=b.s_id
+and a.s_id=c.s_id
+
+--10、查询学过编号‘01’但没有学过编号‘02’课程的同学信息
+--长表转换宽表方法
+select
+	s.*
+from
+	(select
+		s.s_id,
+		max(case when s.c_id='01' then s.s_score end) s01,
+		MAX(case when s.c_id='02' then s.s_score end) s02
+	from
+		Score s
+	group by
+		s.s_id) t,Student s
+where
+	s.s_id=t.s_id
+and t.s01 is not null
+and t.s02 is null
