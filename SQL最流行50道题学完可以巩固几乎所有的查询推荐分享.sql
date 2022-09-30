@@ -505,3 +505,127 @@ from
 	Score
 group by
 	s_id
+
+--16、检索‘01’课程分数小于60，按分数降序排列的学生信息
+--自创
+select s.*,c.s_score from Student s,Score c where exists(
+	select * from
+		(select
+			a.s_id
+		from
+			Score a
+		where
+			a.c_id='01' and s_score<60) t
+	where
+		t.s_id=s.s_id)
+and s.s_id=c.s_id
+and c.c_id='01'
+order by c.s_score desc
+
+--老师
+select
+	b.*,a.s_score
+from
+	Score a
+right join
+	Student b
+on a.s_id=b.s_id
+where
+	a.c_id='01'
+and a.s_score<60
+order by a.s_score desc
+
+--17、按平均成绩从高到低显示所有学生的所有课程的成绩以及平均成绩
+select
+	a1.*,a2.avg_s
+from
+	(select * from Score) a1,
+	(select a.s_id,round(AVG(a.s_score),2) avg_s from Score a group by a.s_id) a2
+where
+	a1.s_id=a2.s_id
+order by avg_s desc
+
+--开窗
+select
+	a.*,
+	AVG(a.s_score) over(partition by a.s_id) avg_S
+from
+	Score a
+order by AVG(a.s_score) over(partition by a.s_id) desc
+
+--18、查询各科成绩最高分、最低分和平均分；以如下形式显示：课程ID，课程name，最高分，最低分，平均分，及格率，中等率，优良率，优秀率
+--及格为>=60,中等为：70-80，优良为：80-90，优秀为：>=90
+select
+	a.*,
+	MAX(a.s_score) over(partition by a.c_id) max_s,
+	MIN(a.s_score) over(partition by a.c_id) min_s,
+	AVG(a.s_score) over(partition by a.c_id) avg_s
+from
+	Score a
+--官方
+select
+	a.c_id,a.c_name,
+	round(MAX(b.s_score),2) max_s, --貌似四舍五入后面也是补的0
+	round(MIN(b.s_score),2) min_s,
+	round(AVG(b.s_score),2) avg_s,
+	round(sum(case when b.s_score>=60 then 1.0 else 0 end)/COUNT(1),2) 及格率,
+	round(sum(case when b.s_score>=70 and b.s_score<80 then 1.0 else 0 end)/COUNT(1),2) 中等率,
+	round(sum(case when b.s_score>=80 and b.s_score<90 then 1.0 else 0 end)/COUNT(1),2) 优良率,
+	round(sum(case when b.s_score>=90 then 1.0 else 0 end)/COUNT(1),2) 优秀率
+from
+	Course a
+left join
+	Score b
+on a.c_id=b.c_id
+group by
+	a.c_id,a.c_name
+
+--19、按各科成绩进行排序，并显示排名
+--窗口函数实现
+select
+	s.c_id,s.s_score,
+	dense_RANK() over(partition by s.c_id order by s.s_score desc) rk --排名函数：rank(并列第一，间断)、dense_rank（并列第一、不间断）、row_number（输出行数）
+from
+	Score s
+
+--子查询来实现，有点烧脑，
+select
+	a.*,
+	(select COUNT(*) from Score b where b.c_id=a.c_id and b.s_score>a.s_score)+1 rk --理解：分别取a表每行分数值作为b表的查询条件了，
+from
+	Score a
+order by
+	a.c_id,a.s_score desc
+
+--20、查询学生的总成绩并排名
+
+--开窗函数实现
+select
+	t.*,
+	RANK() over(order by sum_s desc) rk
+from
+	(select
+		a.s_id,
+		SUM(a.s_score) sum_s
+	from
+		Score a
+	group by
+		a.s_id) t
+
+--子查询实现
+with sum_s_tmp as
+(select
+	s_id,
+	SUM(s_score) sum_s
+from
+	Score
+group by
+	s_id)
+select 
+	*,
+	(select COUNT(*) from sum_s_tmp b where b.sum_s>a.sum_s)+1 rk
+	--(select COUNT(*) from sum_s_tmp b where b.s_id=a.s_id and b.sum_s>a.sum_s)+1 rk，不能加条件b.s_id=a.s_id
+from 
+	sum_s_tmp a
+order by
+	a.sum_s desc
