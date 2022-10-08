@@ -629,3 +629,95 @@ from
 	sum_s_tmp a
 order by
 	a.sum_s desc
+
+--21、查询不同老师所教不同课程平均分从高到低显示
+--自创
+select
+	c.t_name,t.*
+from
+	(select 
+		a.c_id,
+		AVG(a.s_score) avg_s
+	from
+		Score a
+	group by
+		a.c_id) t,Course b, Teacher c
+where
+	t.c_id=b.c_id
+and b.t_id=c.t_id
+order by t.avg_s desc
+
+--官方
+select
+	a.t_name,b.c_name,AVG(c.s_score) avg_s
+from
+	Teacher a
+left join
+	Course b
+on a.t_id=b.t_id
+left join
+	Score c
+on b.c_id=c.c_id
+group by
+	a.t_name,b.c_name
+order by
+	AVG(c.s_score) desc
+
+--22、查询所有课程的成绩第2到第3名的学生信息及该课程成绩
+-- 自创，理解上有区别，这里对课程进行了分组
+select
+	s.*,t2.c_id,c.c_name,t2.s_score,t2.rk
+from
+	(select
+		*
+	from
+		(select
+			*,
+			RANK() over(partition by c_id order by s_score desc) rk
+		from
+			Score) t
+	where
+		t.rk>=2 and t.rk<=3) t2
+left join
+	Course c
+on c.c_id=t2.c_id
+left join
+	Student s
+on s.s_id=t2.s_id
+
+-- 其实题意是不对课程分组，直接全部按分数排序
+select
+	s.*,t.c_id,c.c_name,t.s_score
+from
+	Student s
+left join
+	(select
+		a.*,
+		RANK() over(order by a.s_score desc) rk
+	from
+		Score a) t
+on s.s_id=t.s_id
+left join
+	Course c
+on c.c_id=t.c_id
+where
+	rk in(2,3)
+
+--23、统计各科成绩各分数段人数，课程编号，课程名称[100,85)[85,70)[70,60)[60,0)及所占百分比
+select
+	a.c_id,a.c_name,
+	sum(case when b.s_score>85 and b.s_score<=100 then 1 else 0 end) '[100,85)',
+	sum(case when b.s_score>70 and b.s_score<=85 then 1 else 0 end) '[85,70)',
+	sum(case when b.s_score>60 and b.s_score<=70 then 1 else 0 end) '[70,60)',
+	sum(case when b.s_score>0 and b.s_score<=60 then 1 else 0 end) '[60,0)',
+	sum(case when b.s_score>85 and b.s_score<=100 then 1.0 else 0 end)/COUNT(*) '[100,85)%',
+	sum(case when b.s_score>70 and b.s_score<=85 then 1.0 else 0 end)/COUNT(*) '[85,70)%',
+	sum(case when b.s_score>60 and b.s_score<=70 then 1.0 else 0 end)/COUNT(*) '[70,60)%',
+	sum(case when b.s_score>0 and b.s_score<=60 then 1.0 else 0 end)/COUNT(*) '[60,0)%'
+from
+	Course a
+left join
+	Score b
+on a.c_id=b.c_id
+group by
+	a.c_id,a.c_name
