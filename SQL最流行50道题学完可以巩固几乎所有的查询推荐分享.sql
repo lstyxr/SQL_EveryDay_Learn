@@ -721,3 +721,36 @@ left join
 on a.c_id=b.c_id
 group by
 	a.c_id,a.c_name
+
+--24、查询学生平均成绩及其名次
+select
+	t.*,
+	RANK() over(order by t.avg_s desc) rk
+from
+	(select
+		a.s_id,
+		AVG(a.s_score) avg_s
+	from 
+		Score a
+	group by 
+		a.s_id) t
+--如何用子查询的方法实现
+
+--25、查询各科成绩前三名的记录
+select
+	t2.*
+from
+	(select
+		t.*,
+		RANK() over(partition by c_id order by s_score desc) rk
+	from
+		(select
+			a.*,
+			b.s_score
+		from
+			Course a
+		left join
+			Score b
+		on a.c_id=b.c_id) t) t2
+where
+	t2.rk in (1,2,3)
