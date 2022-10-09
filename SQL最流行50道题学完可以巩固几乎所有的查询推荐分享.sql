@@ -737,6 +737,7 @@ from
 --如何用子查询的方法实现
 
 --25、查询各科成绩前三名的记录
+--自创，注意开窗函数这里多嵌套了一层，没必要，开窗本来就是直接在查询结果上进行的操作，新增一列存放查询结果。
 select
 	t2.*
 from
@@ -754,3 +755,156 @@ from
 		on a.c_id=b.c_id) t) t2
 where
 	t2.rk in (1,2,3)
+
+--官方，不用嵌套子查询，直接开窗取结果
+select
+	*
+from
+	(select
+		a.c_id,a.c_name,b.s_score,
+		RANK() over(partition by a.c_id order by s_score desc) rk
+	from
+		Course a
+	left join
+		Score b
+	on a.c_id=b.c_id) t
+where
+	t.rk in (1,2,3)
+
+--26、查询每门课程被选修的学生数
+select
+	a.c_id,a.c_name,
+	COUNT(b.s_id) cnt_s
+from
+	Course a
+left join
+	Score b
+on b.c_id=a.c_id
+group by
+	a.c_id, a.c_name
+
+--27、查询出只有两门课程的全部学生的学号和姓名
+--Distinct去重
+select
+	distinct *
+from
+	(select
+		a.s_id,a.s_name,
+		COUNT(b.c_id) over(partition by a.s_id) cnt_c
+	from
+		Student a
+	left join
+		Score b
+	on a.s_id=b.s_id) t
+where
+	t.cnt_c=2
+--Group by 分组
+select
+	a.s_id,a.s_name,
+	COUNT(b.c_id) cnt_c
+from
+	Student a
+left join
+	Score b
+on a.s_id=b.s_id
+group by
+	a.s_id,a.s_name
+having
+	COUNT(b.c_id)=2
+
+--28、查询男生、女生人数
+select
+	a.s_sex,
+	COUNT(s_id) cnt_s
+from
+	Student a
+group by
+	a.s_sex
+
+--29、查询名字中含有“风”字的学生信息
+select
+	*
+from
+	Student a
+where
+	a.s_name like '%风%'
+
+--30、查询同名同性学生名单，并统计同名人数
+--直接GROUP BY 就能按同名同性进行分组
+select
+	a.s_name,a.s_sex,
+	COUNT(a.s_id) cnt
+from
+	Student a
+group by
+	a.s_name,a.s_sex
+having
+	COUNT(a.s_id)>1
+
+--数据源没有同名同性的，手动插入1条试试
+insert into Student
+values
+('09','赵雷','1991-01-01','男')
+
+--删除测试数据
+delete from Student where s_id in ('09','10')
+
+--31、查询1990年出身的学生名单
+select
+	*
+from
+	Student a
+where
+	YEAR(a.s_birth)=1990 --这里的1990不用加单引号
+
+--32、查询每门课程的平均成绩，结果按平均成绩降序排列，平均成绩相同时，按课程编号升序排列
+select
+	a.c_id,
+	AVG(a.s_score) avg_s
+from
+	Score a
+group by
+	a.c_id
+order by
+	AVG(a.s_score) desc,a.c_id asc
+
+--33、查询平均成绩大于等于85的所有学生的学号、姓名和平均成绩
+select
+	a.s_id,a.s_name,
+	isnull(AVG(b.s_score),0) avg_s
+from
+	Student a
+left join
+	Score b
+on a.s_id=b.s_id
+group by
+	a.s_id,a.s_name
+having
+	isnull(AVG(b.s_score),0)>=85
+
+--34、查询课程名称为“数学”，且分数低于60的学生姓名和分数
+select
+	a.s_name,b.s_score
+from
+	Student a
+left join
+	Score b
+on a.s_id=b.s_id
+left join
+	Course c
+on c.c_id=b.c_id
+where
+	c.c_name='数学'
+and b.s_score<60
+
+--35、查询所有学生的课程及分数情况
+select
+	a.s_id,a.s_name,c.c_name,b.s_score
+from
+	Student a
+left join
+	Score b
+on a.s_id=b.s_id
+left join
+	Course c
+on c.c_id=b.c_id
