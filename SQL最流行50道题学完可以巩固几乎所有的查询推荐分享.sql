@@ -908,3 +908,231 @@ on a.s_id=b.s_id
 left join
 	Course c
 on c.c_id=b.c_id
+
+--36、查询第一门课程成绩都在70分以上的姓名、课程名称和分数
+--错误的写法，没有考虑条件“每一门课程”
+select
+	a.s_name,c.c_name,b.s_score
+from
+	Student a
+left join
+	Score b
+on a.s_id=b.s_id
+left join
+	Course c
+on c.c_id=b.c_id
+where
+	b.s_score>70
+--正确写法
+--把每一门课程都在70分以上的学生id找出来
+select s_id from Score group by s_id having MIN(s_score)>70 --按学生ID分组后再取最小分数都是70分以上才是正确的写法,只不过省略了最小分数字段的显示（只需要s_id的话可以不写最小分数的列）
+select s_id,MIN(s_score) min_s from Score group by s_id having MIN(s_score)>70 --这也是正确的写法，不省略最小分数列，方便理解
+select distinct s_id from Score where s_score>70 --这个是只要满足其中一门课程在70分以上，不符合题意
+
+--最终写法
+select
+	a.s_name,c.c_name,b.s_score
+from
+	Student a
+left join
+	Score b
+on a.s_id=b.s_id
+left join
+	Course c
+on c.c_id=b.c_id
+where
+	a.s_id in(
+		select s_id from Score group by s_id having MIN(s_score)>70)
+
+--37、查询不及格的课程
+select
+	b.s_id,a.c_id,a.c_name,b.s_score
+from
+	Course a
+left join
+	Score b
+on a.c_id=b.c_id
+where
+	b.s_score<60
+
+--38、查询课程编号为01且成绩在80分以上的学生的学号和姓名
+select
+	a.s_id,a.s_name
+from
+	Student a
+left join
+	Score b
+on a.s_id=b.s_id
+where
+	b.c_id='01'
+and b.s_score>=80
+
+--39、求每门课程的学生人数
+select
+	a.c_name,COUNT(b.s_id) cnt_s
+from
+	Course a
+left join
+	Score b
+on a.c_id=b.c_id
+group by
+	a.c_id,a.c_name
+
+--40、查询选修“张三”老师所授课程的学生中，成绩最高的学生信息及其成绩
+--自创，不知道为什么limit 1不能运行
+with tmp as(
+select
+	a.*,b.s_score
+from
+	Student a
+left join
+	Score b
+on a.s_id=b.s_id
+where
+	b.c_id in(
+		select
+			b.c_id
+		from
+			Teacher a
+		left join
+			Course b
+		on a.t_id=b.t_id
+		where
+			a.t_name='张三'))
+select * from tmp order by s_score desc
+
+--老师的，直接连接student,teacher,course,score四张表为宽表，再作条件筛选，倒序排序，提交第一行，也不支持Limit方法
+select
+	a.*,c.c_name,b.s_score
+from
+	Student a
+left join
+	Score b
+on a.s_id=b.s_id
+left join
+	Course c
+on c.c_id=b.c_id
+left join
+	Teacher d
+on d.t_id=c.t_id
+where
+	d.t_name='张三'
+order by
+	b.s_score desc
+--用子查询作条件
+select
+	a.*,c.c_name,b.s_score
+from
+	Student a
+left join
+	Score b
+on a.s_id=b.s_id
+left join
+	Course c
+on c.c_id=b.c_id
+left join
+	Teacher d
+on d.t_id=c.t_id
+where
+	d.t_name='张三'
+and b.s_score=(
+	select
+		MAX(t.s_score) --子查询获取最大分数
+	from
+		(select
+			a.*,b.s_score
+		from
+			Student a
+		left join
+			Score b
+		on a.s_id=b.s_id
+		left join
+			Course c
+		on c.c_id=b.c_id
+		left join
+			Teacher d
+		on d.t_id=c.t_id
+		where
+			d.t_name='张三') t)
+--测试两个并列最高的情况
+insert into Score
+values
+('08','02',90)
+
+--删除测试数据
+select * from Score
+delete from Score where s_id='08'
+
+--41、查询不同课程成绩相同的学生的学生编号、课程编号、学生成绩
+--自连接求解思路，相同的表做比较
+select
+	distinct a.*
+from
+	Score a, Score b
+where
+	a.c_id!=b.c_id --课程不同
+and a.s_score=b.s_score --分数相同
+
+--42、查询每门课成绩最好的前两名
+--开窗函数
+select
+	*
+from
+	(select
+		*,
+		RANK() over(partition by a.c_id order by s_score desc) rk
+	from
+		Score a) t
+where
+	t.rk in (1,2)
+
+--子查询，还要继续理解
+select
+	*
+from
+	Score a
+where
+	((select COUNT(b.s_score) from Score b where b.c_id=a.c_id and b.s_score>a.s_score)+1)<=2
+order by a.c_id,a.s_score desc
+
+--43、统计每门课程的学生选修人数（超过5人的课程才统计），要求输出课程号和选修人数，查询结果按人数降序排列，若人数相同按课程号升序排列
+select
+	a.c_id,
+	COUNT(b.s_id) cnt_s
+from
+	Course a
+left join
+	Score b
+on a.c_id=b.c_id
+group by
+	a.c_id
+having
+	COUNT(b.s_id)>=5
+order by
+	cnt_s,a.c_id asc
+
+--44、查询至少选修了两门课程的学生学号
+select
+	a.s_id
+from
+	Score a
+group by
+	a.s_id
+having
+	COUNT(a.c_id)>=2 --直接在having中写条件筛选
+
+--45、查询选修了全部课程的学生信息
+select
+	a.*
+from
+	Student a,	
+	(select
+		a.s_id
+	from
+		Score a
+	group by
+		a.s_id
+	having
+		COUNT(a.c_id)=(select COUNT(*) from Course)) b
+where
+	a.s_id=b.s_id
